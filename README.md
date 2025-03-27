@@ -9,19 +9,16 @@ assess interspecific variation in webspinner silk genes by comparing genomic arc
 <br/><br/>
 
 ## Workflow for Genome Assembly
+1) Whole Genome Assembly with Hifiasm
+2) Assembly Quality Control with BUSCO, assemblystats.py & QUAST
+3) Haplotig duplicate purging with PurgeDups
+4) Contamination filtering with BlobToolKit
 
-1) Raw Read Quality Control with FastQC
-2) Whole Genome Assembly with Hifiasm
-3) Assembly Quality Control with BUSCO, assemblystats.py & QUAST
-4) Haplotig duplicate purging with PurgeDups
-5) Contamination filtering with BlobToolKit
-
-## Workflow for Genome Annotation
+## Workflow for Whole Genome Annotation (Feature)
 1) Repeat Element Modeling and Masking with EarlGrey
 2) RNAseq Mapping with MiniMap2
 3) Protein Database Aquisition with OrthoDB
 4) Whole Genome Feature Annotation with BRAKER3
-
 
 ## Workflow for Silk Gene Manual Annotation
 1) Putitive _e-fibroin_ Identification with BLASTx, BioPython and Excel
