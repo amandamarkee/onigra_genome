@@ -269,5 +269,7 @@ For assessing single-copy ortholog recovery as a proxy for assembly completeness
 [ADD MENDEL BUSCO SCRIPT HERE]
 ```
 
-## 4) Haplotig duplicate purging with PurgeDups
+## 4) Duplicate Purging with PurgeDups
+
+
 
