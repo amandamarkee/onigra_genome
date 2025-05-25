@@ -261,15 +261,38 @@ module load quast
 quast assembly.fa 
 ```
 
-<img width="699" alt="Screenshot 2025-04-25 at 11 06 45 AM" src="https://github.com/user-attachments/assets/f5209a98-a3ef-46a3-b936-f0c639e8f3dc" />
+<img width="515" alt="Screenshot 2025-05-25 at 1 31 48 PM" src="https://github.com/user-attachments/assets/7fdc2adb-86fe-45c2-a897-611b0ecacbc4" />
+
+Note: These results were poor, and indicated that we needed to further run Purge Dups to decrease the duplicates and rid of short contigs. 
+This is the first of three QUAST runs for QC: 1) Raw Assembly, 2) Post-Purge Dups, and 3) Post Decontamination 
 
 For assessing single-copy ortholog recovery as a proxy for assembly completeness, I use the following BUSCO script with the orthodb10 Insecta dataset:
 
 ```
-[ADD MENDEL BUSCO SCRIPT HERE]
+#!/bin/bash
+#SBATCH --time=24:00:00   # walltime
+#SBATCH --ntasks=24   # number of processor cores (i.e. tasks)
+#SBATCH --nodes=1   # number of nodes
+#SBATCH --mem-per-cpu=10240M   # memory per CPU core
+#SBATCH -J "onigra_busco"   # job name
+#SBATCH --mail-user=amarkee@amnh.org   # email address
+#SBATCH --mail-type=END
+#SBATCH --mail-type=FAIL
+
+
+# Set the max number of threads to use for programs using OpenMP. Should be <= ppn. Does nothing if the program doesn't use OpenMP.
+export OMP_NUM_THREADS=$SLURM_CPUS_ON_NODE
+
+# LOAD MODULES, INSERT CODE, AND RUN YOUR PROGRAMS HERE
+# BUSCO_CONFIG_FILE=
+source ~/.bashrc
+source ~/.bash_profile
+conda activate busco
+busco -o busco_insecta-25 -i genome_assembly.fasta -l insecta_odb10 -c 24 -m genome #--offline
 ```
 
 ## 4) Duplicate Purging with PurgeDups
 
 
+<img width="419" alt="Screenshot 2025-05-25 at 1 30 27 PM" src="https://github.com/user-attachments/assets/d4232347-a8d0-4cdf-b2f8-1fa2af147481" />
 
