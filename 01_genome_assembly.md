@@ -393,6 +393,111 @@ conda activate purge_dups
 
 get_seqs dups.bed ../onigra_hifiasm.asm.bp.p_ctg.fasta
 ```
+
 ### Results from PurgeDups
 <img width="419" alt="Screenshot 2025-05-25 at 1 30 27 PM" src="https://github.com/user-attachments/assets/d4232347-a8d0-4cdf-b2f8-1fa2af147481" />
+
+## 5) Decontamination Filtering with BlobToolKit
+BlobTools is a bioinformatics toolkit designed to help assess the quality and composition of genome assemblies. It visualizes metrics like GC content, read coverage, and taxonomic classification in interactive "blobplots" to identify potential contamination, symbionts, or misassemblies. This makes it especially useful for genome projects involving non-model organisms or environmental samples. For more information about the package, please see their [website](https://blobtools.readme.io/docs/the-blobtools-workflows#section-summary)
+
+![image](https://github.com/user-attachments/assets/3bef6907-69fc-4c6a-9e27-3b6138852724)
+
+Input Files for building BlobTools Database:
+- blast hits file
+- assembly fasta
+- .bam of raw reads against assembly fasta
+
+Below are the scripts I used to generate each of the input files:
+
+### Step 1: blastn/megablast for whole genome
+
+Note, because this is blasting the entire assembly against the NR database, one blast requires too much memory. Instead,
+I run a blast array by first splitting the assembly as follows:
+
+```
+awk 'BEGIN {n_seq=0;} /^>/ \
+{if(n_seq%50==0){file=sprintf("prefix_%d.fa",n_seq);} \
+print >> file; n_seq++; next;} { print >> file; }' < [O_nigra_assembly].fasta
+```
+
+Then, I list the assembly split files (beginning with "prefix_" into a new file called blast.list:
+```
+ls prefix_* >> blast.list
+```
+
+Lastly, I use this blast.list file as input into the array job below:
+```
+#!/bin/bash
+
+#SBATCH --time=72:00:00   # walltime
+#SBATCH --ntasks=30   # number of processor cores (i.e. tasks)
+#SBATCH --nodes=1   # number of nodes
+#SBATCH --mem-per-cpu=21240M   # memory per CPU core
+#SBATCH -J "blob_blast"   # job name
+#SBATCH --array=1-19
+
+
+# Set the max number of threads to use for programs using OpenMP. Should be <= ppn. Does nothing if the program doesn't use OpenMP.
+export OMP_NUM_THREADS=$SLURM_CPUS_ON_NODE
+
+# LOAD MODULES, INSERT CODE, AND RUN YOUR PROGRAMS HERE
+module purge
+source ~/.bashrc
+conda activate spidroins
+module load blast-plus
+
+i=$SLURM_ARRAY_TASK_ID
+P=`awk "NR==$i" blast.list`
+
+blastn \
+-task megablast \
+-db /apps/blast/databases/nt \
+-query input/${P} \
+-outfmt "6 qseqid staxids bitscore std" \
+-max_target_seqs 20 \
+-max_hsps 1 \
+-evalue 1e-20 \
+-num_threads $SLURM_NTASKS \
+-out blast_out/${P}.blast.out
+```
+
+### Step 2: Asembly Fasta
+
+I moved the assembly produced in the PurgeDups step prior, to my working directory for BlobTools.
+
+### Step 3: Mapping (.bam) file with minimap2
+
+Below is the script I use to generate the sorted .bam file for mapping raw reads back to the assembly.
+
+```
+#!/bin/bash
+#SBATCH --time=25:00:00   # walltime
+#SBATCH --ntasks=20   # number of processor cores (i.e. tasks)
+#SBATCH --nodes=1   # number of nodes
+#SBATCH --mem-per-cpu=20144M   # memory per CPU core
+#SBATCH -J "BlobTools minimap2"   # job name
+#SBATCH --mail-user=amarkee@amnh.org   # email address
+#SBATCH --mail-type=BEGIN
+#SBATCH --mail-type=END
+#SBATCH --mail-type=FAIL
+
+
+# Set the max number of threads to use for programs using OpenMP. Does nothing if the program doesn't use OpenMP.
+export OMP_NUM_THREADS=$SLURM_CPUS_ON_NODE
+
+# LOAD MODULES, INSERT CODE, AND RUN YOUR PROGRAMS HERE
+source ~/.bashrc
+conda activate spidroins
+module load minimap
+module load samtools
+
+./minimap2-2.28_x64-linux/minimap2 \
+-ax map-hifi \
+-t $SLURM_NTASKS \
+/home/fslcollab384/nobackup/archive/genomics_workshop/onigra/blobtools/onigra_purged_asm.fa \
+/home/fslcollab384/nobackup/archive/genomics_workshop/onigra/RAW/m84100_240417_025302_s2.fastq.gz \
+| samtools sort -@$SLURM_NTASKS -O BAM -o onigra_hifiasm_sorted.bam
+
+samtools index onigra_hifiasm_sorted.bam
+```
 
