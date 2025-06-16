@@ -501,3 +501,56 @@ module load samtools
 samtools index onigra_hifiasm_sorted.bam
 ```
 
+### Step 4: Running BlobTools to Identify Contaminants
+```
+#!/bin/bash
+
+#SBATCH --time=24:00:00   # walltime
+#SBATCH --ntasks=1   # number of processor cores (i.e. tasks)
+#SBATCH --nodes=1   # number of nodes
+#SBATCH --mem-per-cpu=12288M   # memory per CPU core
+#SBATCH -J "blobplots"   # job name
+#SBATCH --mail-user=amarkee@amnh.org   # email address
+#SBATCH --mail-type=BEGIN
+#SBATCH --mail-type=END
+#SBATCH --mail-type=FAIL
+
+# Set the max number of threads to use for programs using OpenMP. Should be <= ppn. Does nothing if the program doesn't use OpenMP.
+export OMP_NUM_THREADS=$SLURM_CPUS_ON_NODE
+
+# LOAD MODULES, INSERT CODE, AND RUN YOUR PROGRAMS HERE
+source ~/.bashrc
+conda activate spidroins
+
+blobtools create -i /nobackup/archive/usr/fslcollab384/genomics_workshop/onigra/blobtools/onigra_purged_asm.fa \
+-b /nobackup/archive/usr/fslcollab384/genomics_workshop/onigra/blobtools/onigra_hifiasm_sorted.bam \
+-t /nobackup/archive/usr/fslcollab384/genomics_workshop/onigra/blobtools/onigra_blast-active.out \
+-o onigra_blobplot-ACTIVE
+```
+The resulting file here will be in .json format, and used to filter contaminants later.
+
+### Step 5: Making the Plots
+```
+conda activate blobtools
+mkdir plots
+blobtools plot -i [genome name]_blobplot.blobDB.json -o plots/
+```
+
+Output from this step will provide images of the contaminant plots, like this:
+![onigra_blobplot-ACTIVE blobDB json bestsum phylum p8 span 100 blobplot bam0](https://github.com/user-attachments/assets/43fb8861-deaa-4aba-bdab-00f88b314cf6)
+
+### Step 6: Remove Contaminants 
+You can either use the built-in function in BlobTools called "seqfilter", or the function called "subseq". 
+I was unable to get seqfilter to work again, so I created a list of contaminant contigs to use in seqtk as follows:
+
+```
+# create table from .json output. lists all contaminants and phyla level
+blobtools view -i [blobDB in json format] -r [desired taxonomic level]
+```
+
+I isolated all the contigs I wanted to keep (i.e. contigs assigned to Arthropoda and no-hits) in Excel, because I was lazy today. Then, saved these contig names to a file called "contaminant_contigs-keep.txt". Lastly, I used the following
+code to filter the assembly to only keep the listed contigs:
+
+```
+seqtk subseq original.fasta contigs-to-keep.txt > onigra_purged_asm.filtered.fasta
+```
