@@ -292,7 +292,107 @@ busco -o busco_insecta-25 -i genome_assembly.fasta -l insecta_odb10 -c 24 -m gen
 ```
 
 ## 4) Duplicate Purging with PurgeDups
+PurgeDups is a tool designed to remove haplotigs and contig overlaps in a de novo assembly based on read depth.
+Below are the modified scripts I used from Dr. Paul Frandsen for execution of PurgeDups on the BYU cluster. For further information on PurgeDups, please see their [GitHub Repository](https://github.com/dfguan/purge_dups)
 
+### Step 0: purge_dup_minimap.sh
+```
+#!/bin/bash
 
+#SBATCH --time=72:00:00   # walltime
+#SBATCH --nodes=1   # number of nodes
+#SBATCH --ntasks=16   # number of processor cores (i.e. tasks)
+#SBATCH --mem-per-cpu=16G  # memory per CPU core
+#SBATCH --mail-user=amarkee@amnh.org   # email address
+#SBATCH --mail-type=BEGIN
+#SBATCH --mail-type=END
+#SBATCH --mail-type=FAIL
+
+module load miniconda3/4.12-pws-472
+conda activate minimap2
+
+minimap2 -I6G -xasm20 -t 16 /home/fslcollab384/compute/genomics_workshop/onigra/onigra_hifiasm.asm.bp.p_ctg.fasta \
+../m84100_240417_025302_s2.fastq.gz > ../m84100_240417_025302_s2.fastq.paf.gz
+```
+
+### Step 1: purge_dups_split_assembly.sh
+```
+#!/bin/bash
+
+#SBATCH --time=72:00:00   # walltime
+#SBATCH --nodes=1   # number of nodes
+#SBATCH --ntasks=32   # number of processor cores (i.e. tasks)
+#SBATCH --mem-per-cpu=16G  # memory per CPU core
+#SBATCH --mail-user=amarkee@amnh.org   # email address
+#SBATCH --mail-type=BEGIN
+#SBATCH --mail-type=END
+#SBATCH --mail-type=FAIL
+
+module load miniconda3/4.12-pws-472
+conda activate purge_dups
+
+assembly=../onigra_hifiasm.asm.bp.p_ctg.fasta
+
+split_fa $assembly > $assembly.split && minimap2 -I6G -xasm5 -DP -t 32 $assembly.split $assembly.split | gzip -c - > $assembly.split.self.paf.gz
+```
+
+### Step 2: purge_dup_stats.sh
+```
+#!/bin/bash
+
+#SBATCH --time=72:00:00   # walltime
+#SBATCH --nodes=1   # number of nodes
+#SBATCH --ntasks=4   # number of processor cores (i.e. tasks)
+#SBATCH --mem-per-cpu=8G  # memory per CPU core
+#SBATCH --mail-user=amarkee@amnh.org   # email address
+#SBATCH --mail-type=BEGIN
+#SBATCH --mail-type=END
+#SBATCH --mail-type=FAIL
+
+module load miniconda3/4.12-pws-472
+conda activate purge_dups
+
+pbcstat ../*fastq.paf.gz #(produces PB.base.cov and PB.stat files)
+calcuts PB.stat > cutoffs 2>calcults.log
+```
+
+### Step 3: purge_dups.sh
+```
+#!/bin/bash
+
+#SBATCH --time=72:00:00   # walltime
+#SBATCH --nodes=1   # number of nodes
+#SBATCH --ntasks=8   # number of processor cores (i.e. tasks)
+#SBATCH --mem-per-cpu=28G  # memory per CPU core
+#SBATCH --mail-user=amarkee@amnh.org   # email address
+#SBATCH --mail-type=BEGIN
+#SBATCH --mail-type=END
+#SBATCH --mail-type=FAIL
+
+module load miniconda3/4.12-pws-472
+conda activate purge_dups
+
+purge_dups -2 -T cutoffs -c PB.base.cov ../onigra_hifiasm.asm.bp.p_ctg.fasta.split.self.paf.gz > dups.bed 2> purge_dups.log
+```
+
+### Step 4: purge_dup_get_seqs.sh 
+```
+#!/bin/bash
+
+#SBATCH --time=72:00:00   # walltime
+#SBATCH --nodes=1   # number of nodes
+#SBATCH --ntasks=4   # number of processor cores (i.e. tasks)
+#SBATCH --mem-per-cpu=8G  # memory per CPU core
+#SBATCH --mail-user=amarkee@amnh.org   # email address
+#SBATCH --mail-type=BEGIN
+#SBATCH --mail-type=END
+#SBATCH --mail-type=FAIL
+
+module load miniconda3/4.12-pws-472
+conda activate purge_dups
+
+get_seqs dups.bed ../onigra_hifiasm.asm.bp.p_ctg.fasta
+```
+### Results from PurgeDups
 <img width="419" alt="Screenshot 2025-05-25 at 1 30 27 PM" src="https://github.com/user-attachments/assets/d4232347-a8d0-4cdf-b2f8-1fa2af147481" />
 
